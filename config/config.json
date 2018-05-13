@@ -1,0 +1,37 @@
+{
+	"prefix": "1!",
+	"ignore_bots": false,
+
+	"use_hierarchy": false,
+	"staff_perms": 8326,
+
+	"random_markov": true,
+	"markov_min_messages": 7,
+	"markov_chance": 3,
+	"markov_chance_increase": 0.1,
+	"markov_max_length": 600,
+	"markov_default_max_words": 45,
+
+	"faction_max_messages": 5,
+	"faction_cooldown": 5,
+	"faction_points_per_message": 0.001,
+
+	"allow_hooks": true,
+	"max_hooks_per_message": 6,
+
+	"use_global_censors": true,
+	"global_censored_words": ["fag", "faggot", "nigger", "tranny", "kike", "dyke", "nigga", "retard", "retarded"],
+
+	"save_interval": 300000,
+	"guild_data_timeout_hours": 48,
+
+	"command_dir": "./commands/",
+	"global_dir": "./global_data/",
+	"guilds_dir": "./guild_data/",
+	"memory_file": "memory.json",
+	"markov_file": "markov.dat",
+	"base_markov_data": "./config/base_markov.dat",
+	"token_string": "./config/token.dat",
+
+	"owner_id": "102843234706804736"
+}
