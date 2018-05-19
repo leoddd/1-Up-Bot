@@ -31,19 +31,23 @@ exports.level = "all";
 
 // Help function:
 exports.help = (config, command, message, core) => {
-	return `Returns an invite for the bot. \
+	return `Example help function. \
 					\nUsage: \`${config.prefix}${command}\``;
 }
 
 // Command logic:
+const responses = [
+	// Positive responses.
+	"Yes!", "yes", "Yep", "yea", "yeah", "Definitely.", "Affirmative", "nostn't", "not no", "I guess?", "couldn't hurt", "non't", "YES", "Yes.",
+
+	// Negative responses.
+	"No!", "no", "Nope", "nah", "nuh-uh", "Never.", "Oppositely Yes", "yesn't", "positively negative", "Probably not?", "you'd regret it", "NO", "Absolutely not!", "No.",
+
+	// Ambiguous responses.
+	"Sometimes", "maybe", "better not to take any chances", "yenostn't've", "..perhaps", "Try asking again.",
+
+];
+
 exports.call = (args, info) => {
-	info.bot.generateInvite(["ADD_REACTIONS", "SEND_MESSAGES", "EMBED_LINKS", "ATTACH_FILES", "USE_EXTERNAL_EMOJIS", "CHANGE_NICKNAME", "MANAGE_ROLES"])
-	.then(link => {
-		info.message.channel.send(`You can invite me to your server using this link:\n<${link}>`);
-	})
-	.catch(err => {
-		info.core.log(`Failed to generate invite. Error: ${err}`, "error");
-		info.message.channel.send("Failed to generate invite. Oops!");
-	})
-	;
+	return responses[info.core.randRange({"min": 0, "max": responses.length - 1, "fixed": 0})];
 }

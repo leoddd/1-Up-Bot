@@ -75,7 +75,7 @@ exports.call = (args, info) => {
 				regex = regex.split("/");
 
 				if(regex.length < 2) {
-					return `Regex ${original_regex} is not valid. Make sure to include the options slash even if you don't want to use any options.`;
+					return `Regex \`${original_regex}\` is not valid. Make sure to include the options slash even if you don't want to use any options.`;
 				}
 
 				// Build the regex object.

@@ -27,7 +27,7 @@
 /////
 
 // Level of authority required.
-exports.level = "staff";
+exports.level = "admin";
 
 // Help function:
 exports.help = (config, command, message) => {
@@ -39,27 +39,29 @@ exports.help = (config, command, message) => {
 const isUrl = require('is-url-superb');
 
 exports.call = (args, info) => {
-	
-	var result = false;
 
+	// Check if first argument is a link.
+	var found_link = false;
 	if(args.length !== 0) {
 		if(isUrl(args[0])) {
-			result = setAvatar(args[0], info);
-			return true;
+			setAvatar(args[0], info);
+			found_link = true;
 		}
 	} 
 
-	if(!result) {
+	// If no URL was found, try and use the image embed.
+	if(!found_link) {
 		const embedded_image = info.message.attachments.first();
 		if(embedded_image && !isNaN(embedded_image.height)) {
-			result = setAvatar(embedded_image.url, info);
+			setAvatar(embedded_image.url, info);
+			found_link = true;
 		}
 	}
 
 
 	return {
 		"log": `New profile picture setting attempt by ${info.message.author.tag} (${info.message.author.id}).`,
-		"msg": result ? "" : "Missing URL or image.",
+		"msg": found_link ? "" : "Missing URL or image.",
 	};
 }
 

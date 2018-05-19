@@ -72,7 +72,7 @@ exports.call = (args, info) => {
 		info.temp.guilds[flake].markov_object = markov_chain;
 
 		// Start loading and type while doing so.
-		info.core.log(`Started loading for guild "${info.message.guild.name}" (id: ${info.message.guild.id}).`, "markov");
+		info.core.log(`Started loading markov data for guild "${info.message.guild.name}" (id: ${info.message.guild.id}).`, "markov");
 		info.message.channel.startTyping();
 
 		// Callback when the markov has finished reading the data.
@@ -128,10 +128,16 @@ exports.call = (args, info) => {
 			var self_nick = info.core.getCurrentName(info.bot.user, info.message.guild);
 			var author_nick = info.core.getCurrentName(info.message.author, info.message.guild);
 
-			return markov_response.join(" ")
-				.substring(0, info.config.markov_max_length)
-				.replace(new RegExp(self_nick, 'g'), author_nick)
-				.replace(new RegExp(self_nick.toLowerCase(), 'g'), author_nick.toLowerCase());
+			markov_response = markov_response.join(" ")
+			.substring(0, info.config.markov_max_length)
+			.replace(new RegExp(self_nick.toLowerCase(), 'g'), author_nick.toLowerCase())
+			.replace(new RegExp(self_nick, 'gi'), author_nick);
+
+			if(info.config.markov_output_pings === false) {
+				markov_response = markov_response.replace(/\<\@.*?\>/g, `<@${info.message.author.id}>`);
+			}
+
+			return markov_response;
 		} else {
 			return "I have failed you, mother. I could not create the response you wished for. Punish me for my sins.";
 		}

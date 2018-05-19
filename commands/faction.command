@@ -105,7 +105,7 @@ exports.call = (args, info) => {
 			else {
 				var cur_faction = guild_mem.factions[role_name];
 				var return_string = `Removed the \`${role_name}\` role from the list of joinable factions. \
-								\nMembers: \`${info.message.guild.roles.find("name", role_name).members.size}\` - Score: \`${Math.floor(cur_faction.activity_points) + Math.floor(cur_faction.bonus_points)}\` (\`${Math.floor(cur_faction.activity_points)}AP\` + \`${Math.floor(cur_faction.bonus_points)}BP\`)`;
+								\nMembers: \`${info.message.guild.roles.find("name", role_name).members.size}\` - ${getScore(cur_faction)}`;
 				delete guild_mem.factions[role_name];
 				if(Object.keys(guild_mem.factions).length === 0) {
 					delete guild_mem.factions;
@@ -125,7 +125,7 @@ exports.call = (args, info) => {
 				Object.keys(guild_mem.factions).forEach(role_name => {
 					var cur_faction = guild_mem.factions[role_name];
 
-					var faction_string = `\`${role_name}\`: Members: \`${info.message.guild.roles.find("name", role_name).members.size}\` - Score: \`${Math.floor(cur_faction.activity_points) + Math.floor(cur_faction.bonus_points)}\` (\`${Math.floor(cur_faction.activity_points)}AP\` + \`${Math.floor(cur_faction.bonus_points)}BP\`)`;
+					var faction_string = `\`${role_name}\`: Members: \`${info.message.guild.roles.find("name", role_name).members.size}\` - ${getScore(cur_faction)}`;
 					return_string = `${return_string}\n${faction_string}`;
 				});
 
@@ -182,7 +182,7 @@ exports.call = (args, info) => {
 			}
 
 			return `The \`${role_name}\` faction ${operation === "add" ? "gained" : "lost"} \`${amount}\` Bonus Points. \
-							\nScore: \`${Math.floor(cur_faction.activity_points) + Math.floor(cur_faction.bonus_points)}\` (\`${Math.floor(cur_faction.activity_points)}AP\` + \`${Math.floor(cur_faction.bonus_points)}BP\`)`;
+							\n${getScore(cur_faction)}`;
 
 		},
 
@@ -192,4 +192,9 @@ exports.call = (args, info) => {
 		},
 
 	});
+}
+
+// Returns a score string for the given faction object.
+function getScore(faction) {
+	return `Score: \`${Math.floor(faction.activity_points) + Math.floor(faction.bonus_points)}\` (\`${Math.floor(faction.activity_points)}AP\` + \`${Math.floor(faction.bonus_points)}BP\`)`;
 }

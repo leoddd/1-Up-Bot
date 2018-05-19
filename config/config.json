@@ -2,7 +2,7 @@
 	"prefix": "1!",
 	"ignore_bots": false,
 
-	"use_hierarchy": false,
+	"use_hierarchy": true,
 	"staff_perms": 8326,
 
 	"random_markov": true,
@@ -11,6 +11,7 @@
 	"markov_chance_increase": 0.1,
 	"markov_max_length": 600,
 	"markov_default_max_words": 45,
+	"markov_output_pings": true,
 
 	"faction_max_messages": 5,
 	"faction_cooldown": 5,
@@ -22,7 +23,7 @@
 	"use_global_censors": true,
 	"global_censored_words": ["fag", "faggot", "nigger", "tranny", "kike", "dyke", "nigga", "retard", "retarded"],
 
-	"save_interval": 300000,
+	"save_interval": 10,
 	"guild_data_timeout_hours": 48,
 
 	"command_dir": "./commands/",

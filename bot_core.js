@@ -19,6 +19,7 @@
 //  markov_chance_increase: How much the chance should rise with each passing message. This makes it so the bot never gets too comfortable.
 //  markov_max_length: Maximum amount of letters a random markov response can return.
 //  markov_default_max_words: Maximum amount of words a random markov response can return.
+//  markov_output_pings: Whether the bot will store pings in memory. Can get annoying!
 //
 //  faction_max_messages: How many messages will count towards the point gaining algorithm until the cooldown is up.
 //  faction_cooldown: How long, in minutes, to wait before reseting the messages sent by a user to 0 in the faction algorithm.
@@ -33,7 +34,7 @@
 //
 //  global_censored_words: A list of words that the markov machine will not feed itself, so as to avoid the bot repeating bad words.
 //
-//  save_interval: How often to write memory to disc, in milliseconds. As a failsafe the bot always saves on quit.
+//  save_interval: How often to write memory to disc, in minutes. As a failsafe the bot always saves on quit.
 //  guild_data_timeout_hours: How many hours it takes until a guild's data is deleted once the bot leaves it. Don't set too low or an outage will delete data!
 //
 //  command_dir: The directory that contains all of the bots' command files. See below for explanation.
@@ -188,16 +189,18 @@ function init() {
 	core.resetFactionMessages = resetFactionMessages;
 	core.makeEmbed = makeEmbed;
 	core.makeGuildDir = makeGuildDir;
-	core.deleteGuildData = deleteGuildData;
+	core.deleteGuildDataUnlessPresent = deleteGuildDataUnlessPresent;
 
 	core.isByBotAdmin = isByBotAdmin;
 	core.isByStaffMember = isByStaffMember;
+	core.isPublic = isPublic;
 	core.hasCommandPermission = hasCommandPermission;
 	core.hasLevel = hasLevel;
 	core.isValidPermissionLevel = isValidPermissionLevel;
 
 	core.getCurrentName = getCurrentName;
 	core.getNewID = getNewID;
+	core.randRange = randRange;
 
 	core.msToInterval = msToInterval;
 	core.setPersistentTimeout = setPersistentTimeout;
@@ -208,11 +211,12 @@ function init() {
 	core.commandSwitch = commandSwitch;
 	core.commandBundle = commandBundle;
 
-	// Log in!
-	bot.login(fs.readFileSync(config.token_string, 'utf8'));
 
 	// Save memory to disc at an interval.
-	save_interval = setInterval(commitMemory, config.save_interval);
+	save_interval = setInterval(commitMemory, config.save_interval * 60000);
+
+	// Log in!
+	bot.login(fs.readFileSync(config.token_string, 'utf8'));
 }
 
 // Cleans up the bot and logs out.
@@ -263,6 +267,9 @@ function hookUpBot() {
 		// Restore "playing" state from memory.
 		bot.user.setActivity(memory.activity.string, {type: memory.activity.type});
 
+		// Clear all queued deletion timers if the bot is in that server now.
+		verifyQueuedDeletions();
+
 		// Load all persistent timeouts. Needs to be on ready, because it may want to send messages immediately.
 		reviveAllPersistentTimeouts();
 
@@ -280,12 +287,7 @@ function hookUpBot() {
 		initializeGuildMemory(guild);
 
 		// If there's a guild memory deletion queued up, cancel it.
-		var guild_mem = memory.guilds[guild.id];
-		if(guild_mem.hasOwnProperty("queued_deletion")) {
-			clearPersistentTimeout(guild_mem.queued_deletion);
-
-			delete guild_mem.queued_deletion;
-		}
+		clearDeletion(guild.id);
 
 		log(`Joined guild ${guild.name} (id: ${guild.id}) with ${guild.memberCount} users.`, "guild action")
 	});
@@ -295,7 +297,7 @@ function hookUpBot() {
 
 		// When leaving a guild, set a persistent timer to delete it and its channels' data.
 		memory.guilds[guild.id].queued_deletion = setPersistentTimeout({
-			"name": "deleteGuildData",
+			"name": "deleteGuildDataUnlessPresent",
 			"args": guild.id,
 			"type": "core",
 		}, config.guild_data_timeout_hours * 3600000);
@@ -367,6 +369,7 @@ function hookUpBot() {
 				const args = makeArrayOfWords(clean_content, guild_config.prefix.length);
 				const command = args.shift().toLowerCase();
 
+				log(`${message.author.tag} (${message.author.id}) called \`${command} ${args.join(" ")}\`.`, "log");
 				callCommand(command, args, message);
 			}
 
@@ -415,7 +418,7 @@ function hookUpBot() {
 		}
 
 		// After all is said and done, since the message was not a command, store it in the markov data (if not by a bot).
-		if(!is_command && !message.author.bot) {
+		if(!is_command && !message.author.bot && isPublic(message)) {
 			feedMarkov(message.guild, clean_content);
 			calculateFactionPoints(message);
 		}
@@ -481,7 +484,7 @@ function handleCommandResponse(response, message) {
 
 	// Print log.
 	if(response.log) {
-		log(response.log, "response");
+		log(response.log, "log");
 	}
 
 	// Post message.
@@ -505,7 +508,7 @@ function handleCommandResponse(response, message) {
 	if(response.memory) {
 		// If not valid object.
 		if(!response.memory instanceof Object) {
-			log(`Memory return of command '${command}' is not an object; can not be committed.`, "response");
+			log(`Memory return of command '${command}' is not an object; can not be committed.`, "error");
 		}
 
 		// If the memory is a valid object, copy all keys into the global memory object.
@@ -630,7 +633,7 @@ function loadMemorySync() {
 
 // Saves 'memory' object to disc asynchronously.
 function commitMemory() {
-	fs.writeFileSync(`${config.global_dir}${config.memory_file}`, JSON.stringify(memory), err => {
+	fs.writeFile(`${config.global_dir}${config.memory_file}`, JSON.stringify(memory), (err) => {
 		if(err) {
 			log(`Memory could not be saved. Error: ${err}`, "memory");
 		} else {
@@ -674,9 +677,33 @@ function deleteGuildData(guild_id) {
 			delete memory.channels[channel_id];
 		}
 	});
-	
 
 	log(`Deleted guild data for guild ID ${guild_id}.`, "guild data");
+}
+
+// Wrapper for the above that first checks if the bot is currently inside that guild.
+// If so, do not forget after all.
+function deleteGuildDataUnlessPresent(guild_id) {
+	if(bot.guilds.get(guild_id) === undefined) {
+		deleteGuildData(guild_id);
+	}
+}
+
+// Loops through all guilds the bot is in and deletes their deletion timeouts, if any are present.
+function verifyQueuedDeletions() {
+	// Loop through all guilds the bot is in.
+	bot.guilds.forEach((guild, guild_id) => {
+		clearDeletion(guild_id);
+	});
+}
+
+// Clears the deletion of the given guild id's data, if one is queued.
+function clearDeletion(guild_id) {
+	// Check if the guild has registered memory, including a deletion timer.
+	if(memory.guilds.hasOwnProperty(guild_id) && memory.guilds[guild_id].hasOwnProperty("queued_deletion")) {
+		clearPersistentTimeout(memory.guilds[guild_id].queued_deletion);
+		delete memory.guilds[guild_id].queued_deletion;
+	}
 }
 
 
@@ -729,8 +756,12 @@ function isChannelMuted(channel) {
 
 // Get currently visible name of the given user object.
 function getCurrentName(user, guild) {
-	var nick = guild.members.get(user.id).nickname;
-	return nick ? nick : user.username;
+	var member = guild.members.get(user.id)
+	if(!member) {
+		return user.username;
+	}
+	
+	return member.nickname ? member.nickname : user.username;
 }
 
 
@@ -1020,6 +1051,7 @@ function matchHooks(message) {
 					});
 
 					// Call the associated command with the given arguments.
+					log(`${message.author.tag} (${message.author.id}) triggered hook \`${hook_ID}\` => \`${cur_hook.command} ${args_to_pass.join(" ")}\`.`, "log");
 					callCommand(cur_hook.command, args_to_pass, message);
 				}
 
@@ -1423,6 +1455,23 @@ function isByStaffMember(message) {
 	// Check if the author fulfills the guild-specific staff requirement.
 	var guild_config = getGuildConfig(message.guild);
 	return !guild_config.use_hierarchy || message.member.permissions.has(guild_config.staff_perms);
+}
+
+// Returns whether the message given is in a public channel accessible by everyone.
+function isPublic(message) {
+	// If the message isn't in a guild, it's not public.
+	if(!message.guild || !message.channel) {
+		return;
+	}
+
+	// Check if the @everyone role is denied read permissions in this channel.
+	var perms = message.channel.permissionOverwrites.get(message.guild.defaultRole.id);
+	if((perms.deny & Discord.Permissions.FLAGS.READ_MESSAGES) !== 0) {
+		return false;
+	}
+	else {
+		return true;
+	}
 }
 
 // Returns a RichEmbed object.

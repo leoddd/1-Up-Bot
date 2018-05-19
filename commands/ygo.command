@@ -84,12 +84,12 @@ exports.call = (args, info) => {
 			ygomem.card_names = data.cards;
 			ygomem.state = READY;
 
-			core.log(`Successfully loaded the Yu-Gi-Oh card database.`, "response");
+			core.log(`Successfully loaded the Yu-Gi-Oh card name database.`, "log");
 			core.emit(EVENT_NAME);
 
 		});
 
-		core.log(`Started loading the Yu-Gi-Oh card database from "${YGO_ALL_CARDS}".`, "response");
+		core.log(`Started loading the Yu-Gi-Oh card name database from "${YGO_ALL_CARDS}".`, "log");
 	}
 
 
@@ -346,6 +346,6 @@ exports.call = (args, info) => {
 
 // If we failed to connect to the card database, remove all dependencies on it and complain.
 function failedToConnect(info, err, url) {
-	info.core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "response");
+	info.core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
 	info.message.channel.send(`Could not reach Yu-Gi-Oh card database at ${url}, sorry. Error: \`\`\`${err}\`\`\`.`);
 }

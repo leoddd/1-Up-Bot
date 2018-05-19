@@ -88,7 +88,7 @@ exports.call = (args, info) => {
 
 		"markov_chance": {
 			"help": "If `random_markov` is true, how high the chance is for me to respond to someone's message, in percent.",
-			"legal": value => {return (!isNaN(value)) && parseFloat(value) >= 0.1 && parseFloat(value) <= 100},
+			"legal": value => {return (!isNaN(value)) && parseFloat(value) >= 0.01 && parseFloat(value) <= 100},
 		},
 
 
@@ -103,11 +103,15 @@ exports.call = (args, info) => {
 			"legal": value => {return (!isNaN(value)) && parseFloat(value) >= 1 && parseFloat(value) <= 2000},
 		},
 
-
 		"markov_default_max_words": {
 			"help": "The default word limit for every markov response I give. \
 			        Since words can be long, this mostly just changes the way I structure my sentences instead of preventing me from rambling on.",
 			"legal": value => {return (!isNaN(value)) && parseFloat(value) >= 1 && parseFloat(value) <= 500},
+		},
+
+		"markov_output_pings": {
+			"help": "Whether markov messages can contain random pings the bot picked up.",
+			"legal": value => {return value === "true" || value === "false"},
 		},
 
 
@@ -171,10 +175,10 @@ exports.call = (args, info) => {
 
 						settings[target_setting] = new_value;
 
-						return `Set \`${target_setting}\` to "${new_value}".`;
+						return `Set \`${target_setting}\` to \`${new_value}\`.`;
 
 					} else {
-						return `"${new_value}"" is not an acceptable value for that setting.`;
+						return `\`${new_value}\` is not an acceptable value for that setting.`;
 					}
 
 				} else {
