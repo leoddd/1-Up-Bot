@@ -71,13 +71,13 @@ exports.call = (args, info) => {
 
 			if(err) {
 				failedToConnect(info, err, YGO_ALL_CARDS);
-				info.core.removeAllListeners(EVENT_NAME);
+				core.removeAllListeners(EVENT_NAME);
 				return;
 			}
 
 			if(data.status !== "success") {
 				failedToConnect(info, `The database returned the status \`${data.status}\`.`, YGO_ALL_CARDS);
-				info.core.removeAllListeners(EVENT_NAME);
+				core.removeAllListeners(EVENT_NAME);
 				return;
 			}
 
@@ -346,6 +346,6 @@ exports.call = (args, info) => {
 
 // If we failed to connect to the card database, remove all dependencies on it and complain.
 function failedToConnect(info, err, url) {
-	info.core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
+	core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
 	info.message.channel.send(`Could not reach Yu-Gi-Oh card database at ${url}, sorry. Error: \`\`\`${err}\`\`\`.`);
 }

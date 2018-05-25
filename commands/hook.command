@@ -33,7 +33,7 @@ exports.level = "staff";
 exports.help = (config, command, message) => {
 	return `Make me respond to certain message texts with certain commands.\nYou can \`list\` current hooks, \`add\` a new hook or \`clear\` an existing hook using its string ID given in the \`list\`. \
 					\nUsage: \`${config.prefix}${command} [add|clear|list] [string|regex] [command]\` \
-					\nExamples: \`${config.prefix}${command} list\`, \`${config.prefix}${command} add ping say pong\`, \`${config.prefix}${command} clear ping\`, \`${config.prefix}${command} add /{(.*?)}/g ygo.\`, \`${config.prefix}${command} add bear bear.\``;
+					\nExamples: \`${config.prefix}${command} list\`, \`${config.prefix}${command} add ping say pong\`, \`${config.prefix}${command} clear ping\`, \`${config.prefix}${command} add /{(.*?)}/g ygo.\`, \`${config.prefix}${command} add bear bear.\`, \`${config.prefix}${command} add /^(?:can|should|will)\\040(.*?)\\?/ 8ball\``;
 }
 
 // Command logic:

@@ -46,17 +46,26 @@ exports.call = (args, info) => {
 
 	// No response in DMs.
 	if(!info.message.guild) {
-		return "No markovs in DMs. Who am I supposed to speak after!";
+		return "No markovs in DMs.";
 	}
 
 	// Directory for the current guild.
 	var flake = info.message.guild.id;
+	var guild_temp = info.temp.guilds[flake];
 	var markov_data = `${info.core.basePath}${info.config.guilds_dir}${flake}/${info.config.markov_file}`;
 
+	const event_name = `markov_${info.message.guild.id}`;
+
+
+	// Initialize guild's markov memory if needed.
+	if(guild_temp.markov === undefined) {
+		guild_temp.markov = {};
+	}
 
 	// File exists, so see if we need to read it in.
 	// If we haven't started loading yet, start loding.
-	if(info.temp.guilds[flake].markov_state === undefined) {
+
+	if(guild_temp.markov.state === undefined) {
 
 		// If no markov data exists, just exit.
 		try {
@@ -66,34 +75,78 @@ exports.call = (args, info) => {
 		}
 
 		// Begin loading.
-		info.temp.guilds[flake].markov_state = LOADING;
+		guild_temp.markov.state = LOADING;
+		guild_temp.markov.lines = 0;
 
 		var markov_chain = Markov(2);
-		info.temp.guilds[flake].markov_object = markov_chain;
+		guild_temp.markov.object = markov_chain;
 
 		// Start loading and type while doing so.
 		info.core.log(`Started loading markov data for guild "${info.message.guild.name}" (id: ${info.message.guild.id}).`, "markov");
 		info.message.channel.startTyping();
 
-		// Callback when the markov has finished reading the data.
-		var markov_stream = fs.createReadStream(markov_data);
-		markov_chain.seed(markov_stream, () => {
-			info.temp.guilds[flake].markov_state = READY;
-			info.core.callCommand('markov', args, info.message);
-			info.message.channel.stopTyping();
-			info.core.log(`Markov data for guild "${info.message.guild.name}" (id: ${info.message.guild.id}) is ready.`, "markov");
+		// Process part of the markov data set until done.
+		var markov_stream = fs.createReadStream(markov_data, {encoding: "utf8", highWaterMark: 8 * 1024});
+		var markov_success = true;
+		var markov_lines = 0;
+
+		markov_stream.on('data', (chunk) => {
+			// Feed line by line.
+			var lines = chunk.split("\n");
+			lines.some(line => {
+				markov_chain.seed(line);
+				markov_lines += 1;
+				if(markov_lines >= info.config.markov_data_limit) {
+					markov_stream.destroy();
+					return true;
+				}
+			});
 		});
 
+		// If there's an error, end here.
+		markov_stream.on('error', (err) => {
+			guild_temp.markov.state = undefined;
+			guild_temp.markov.object = undefined;
+			guild_temp.markov.lines = undefined;
+			info.message.channel.send("Failed when trying to load the markov set. Oops!");
+			info.core.log(`Failed to load the markov data for guild "${info.message.guild.name}" (id: ${info.message.guild.id}). Error: ${err}`, "error");
+			info.core.removeAllListeners(event_name);
+
+			markov_success = false;
+		});
+
+		// When we finished reading it in and didn't fail, call this command again.
+		markov_stream.on('close', () => {
+			info.message.channel.stopTyping();
+			if(markov_success === true) {
+				guild_temp.markov.state = READY;
+				guild_temp.markov.lines = markov_lines;
+				info.core.log(`Markov data for guild "${info.message.guild.name}" (id: ${info.message.guild.id}) is ready.`, "markov");
+				
+				info.core.emit(event_name);
+			}
+		});
 	}
 
-	// If it is currently loading, try to call this command again later.
-	if(info.temp.guilds[flake].markov_state === LOADING) {
+
+
+	//////
+	// Executing logic.
+
+	// If it is currently loading, try to call this command again when the data is loaded.
+	if(guild_temp.markov.state === LOADING) {
+
+		info.core.once(event_name, () => {
+			info.core.callCommand(info.command, args, info.message);
+		});
+		return;
+
 	}
 	// If it is already loaded, just call the markov!
-	else if(info.temp.guilds[flake].markov_state === READY) {
+	else if(guild_temp.markov.state === READY) {
 
 		var markov_response = undefined;
-		var markov_chain = info.temp.guilds[flake].markov_object;
+		var markov_chain = guild_temp.markov.object;
 
 		// First, get the word limit. If the first argument is a number, use that.
 		var limit = info.config.markov_default_max_words;
@@ -124,6 +177,7 @@ exports.call = (args, info) => {
 			markov_response = markov_chain.respond(args.join(" "), limit / 2);
 		}
 
+		// If there is a valid markov response, print it.
 		if(markov_response.length !== 0) {
 			var self_nick = info.core.getCurrentName(info.bot.user, info.message.guild);
 			var author_nick = info.core.getCurrentName(info.message.author, info.message.guild);
@@ -131,7 +185,9 @@ exports.call = (args, info) => {
 			markov_response = markov_response.join(" ")
 			.substring(0, info.config.markov_max_length)
 			.replace(new RegExp(self_nick.toLowerCase(), 'g'), author_nick.toLowerCase())
-			.replace(new RegExp(self_nick, 'gi'), author_nick);
+			.replace(new RegExp(self_nick, 'gi'), author_nick)
+			.replace(/\s+/g, " ")
+			.trim();
 
 			if(info.config.markov_output_pings === false) {
 				markov_response = markov_response.replace(/\<\@.*?\>/g, `<@${info.message.author.id}>`);

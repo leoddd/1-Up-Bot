@@ -30,6 +30,8 @@
 //  use_global_censors: Whether to use the global list of censored words to filter out markov data.
 //
 // GLOBAL CONFIG:
+//  markov_data_limit: How many lines the markov data files are supposed to contain. This is not an absolute limit, but will be worked around.
+//
 //  max_hooks_per_message: The maximum amount of times any hook will iterate over a given message, to prevent infinite loops in case of severe error.
 //
 //  global_censored_words: A list of words that the markov machine will not feed itself, so as to avoid the bot repeating bad words.
@@ -98,8 +100,8 @@
 
 /////////////
 // Generic imports.
-const fs = require('fs-extra');
 const Discord = require('discord.js');
+const fs = require('fs-extra');
 const cleanup = require('node-cleanup');
 const merge = require('deepmerge');
 const randRange = require('random-floating');
@@ -116,6 +118,7 @@ const censorString = require('censoring');
 
 var config = JSON.parse(fs.readFileSync('./config/config.json', 'utf8'));
 var blocking_input = true;
+var memory_loaded = false;
 
 var bot = undefined;
 var save_interval = undefined;
@@ -369,7 +372,7 @@ function hookUpBot() {
 				const args = makeArrayOfWords(clean_content, guild_config.prefix.length);
 				const command = args.shift().toLowerCase();
 
-				log(`${message.author.tag} (${message.author.id}) called \`${command} ${args.join(" ")}\`.`, "log");
+				log(`${message.author.tag} (${message.author.id}) called \`${command}${args.length > 0 ? " " : ""}${args.join(" ")}\`.`, "log");
 				callCommand(command, args, message);
 			}
 
@@ -616,6 +619,8 @@ function handleSignal(signal) {
 
 // Loads memory from disc into the global 'memory' object. No async version as this only happens on boot.
 function loadMemorySync() {
+	memory_loaded = true;
+
 	try {
 		// Check if memory file exists.
 		fs.accessSync(`${config.global_dir}${config.memory_file}`, fs.constants.R_OK | fs.constants.W_OK);
@@ -633,6 +638,11 @@ function loadMemorySync() {
 
 // Saves 'memory' object to disc asynchronously.
 function commitMemory() {
+	if(memory_loaded === false) {
+		log(`Didn't commit memory because no memory has been loaded yet, danger of overwriting exists.`);
+		return;
+	}
+
 	fs.writeFile(`${config.global_dir}${config.memory_file}`, JSON.stringify(memory), (err) => {
 		if(err) {
 			log(`Memory could not be saved. Error: ${err}`, "memory");
@@ -644,6 +654,11 @@ function commitMemory() {
 
 // Saves 'memory' object to disc, blocking. Used during cleanup on program exit.
 function commitMemorySync() {
+	if(memory_loaded === false) {
+		log(`Didn't commit memory because no memory has been loaded yet, danger of overwriting exists.`);
+		return;
+	}
+
 	fs.writeFileSync(`${config.global_dir}${config.memory_file}`, JSON.stringify(memory));
 	log(`Saved memory to ${config.global_dir}${config.memory_file}.`, "memory");
 }
@@ -1052,7 +1067,7 @@ function matchHooks(message) {
 
 					// Call the associated command with the given arguments.
 					log(`${message.author.tag} (${message.author.id}) triggered hook \`${hook_ID}\` => \`${cur_hook.command} ${args_to_pass.join(" ")}\`.`, "log");
-					callCommand(cur_hook.command, args_to_pass, message);
+					callCommand(cur_hook.command, args_to_pass, message, true);
 				}
 
 			}
@@ -1124,24 +1139,35 @@ function getNewID(obj, size) {
 
 // Adds the given string to the markov chain object for the given guild and saves it to disc.
 function feedMarkov(guild, new_string) {
-	// Trim and sanitize the string, then strip the bots' name and pings.
-	new_string =
-		`\n${
-			new_string
-			.replace(`<@!${bot.user.id}>`, "")
-			.replace(/\s+/g, " ")
-			.trim()
-		}`;
-
-	// If the resulting string is empty, just quit out.
-	if(new_string === "" || new_string === " " || new_string === "\n") {
+	// Only feed it in if the server even wants random markoving to exist.
+	if(getGuildConfig(guild).random_markov !== true) {
 		return;
 	}
 
-	// To start, simply feed the new string into the running markov machine, no matter what happens to the data files.
-	if(temp.guilds[guild.id].markov_state !== undefined) {
-		temp.guilds[guild.id].markov_object.seed(new_string);
+	// Trim and sanitize the string.
+	new_string =
+		`\n${
+			new_string
+			.trim()
+			.replace(/\s+/g, " ")
+		}`;
+
+	// If the resulting string is empty, just quit out.
+	if(new_string === "\n") {
+		return;
 	}
+
+	// Initialize guild's markov memory if needed.
+	var guild_temp = temp.guilds[guild.id];
+	if(guild_temp.markov === undefined) {
+		guild_temp.markov = {};
+	}
+
+	// To start, simply feed the new string into the running markov machine, no matter what happens to the data files.
+	if(guild_temp.markov.state === 'ready') {
+		guild_temp.markov.object.seed(new_string);
+	}
+
 
 	// Then, see if we need to create a fresh file.
 	var data_path = `${config.guilds_dir}${guild.id}/${config.markov_file}`;
@@ -1157,11 +1183,100 @@ function feedMarkov(guild, new_string) {
 		}
 	}
 
-	// File is there now, so try and append to it.
+	// File is guaranteed to be there now, so try and append to it.
 	try {
 		fs.appendFileSync(data_path, new_string);
 	} catch(err) {
 		log(`Could not save new markov data to "${data_path}".`, "markov");
+	}
+
+	// Increase the number of lines the file has, and if it exceeds the limit, truncate it by a bunch.
+	if(guild_temp.markov.state === 'ready' && guild_temp.markov.currently_truncating !== true) {
+		guild_temp.markov.lines += 1;
+		if(guild_temp.markov.lines >= config.markov_data_limit) {
+			guild_temp.markov.currently_truncating = true;
+			log(`"${data_path}" exceeded the markov data limit and will be truncated.`, "markov");
+
+
+			// Read the file data and discard everything below a certain line count.
+			var markov_stream = fs.createReadStream(data_path, {encoding: "utf8", highWaterMark: 16 * 1024});
+			var new_file = undefined;
+			var line_count = -1;
+			var success = true;
+
+			markov_stream.on('data', (chunk) => {
+				// Start out by counting lines until we hit our limit (half the actual limit).
+				var last_newline = -1;
+				do {
+					last_newline = chunk.indexOf("\n", last_newline + 1);
+					line_count += 1;
+					// If we reach a line number higher than half the limit, stop counting and pipe it.
+					if(line_count >= Math.ceil(config.markov_data_limit / 3)) {
+						markov_stream.removeAllListeners('data');
+
+						// Create new file and fill it with the remainder of this chunk.
+						try {
+							fs.accessSync(`${data_path}.old`);
+							fs.unlinkSync(`${data_path}.old`);
+						} catch(err) { // Empty because it's not an issue if we can't delete that.
+						}
+
+						try {
+							fs.renameSync(data_path, `${data_path}.old`);
+						} catch(err) {
+							log(`Could not rename markov dataset at ${data_path}. Error: ${err}`, "markov")
+							success = false;
+							return;
+						}
+						new_file = fs.createWriteStream(data_path);
+						new_file.write(chunk.substring(last_newline + 1));
+
+						// Pipe the rest of the stream into the file directly.
+						markov_stream.pipe(new_file);
+
+						// Exit while loop.
+						break;
+					}
+				} while(last_newline !== -1);
+			});
+
+			markov_stream.on('error', (err) => {
+				log(`Error when trying to truncate markov dataset at "${data_path}": ${err}`, "markov");
+				success = false;
+			});
+
+			markov_stream.on('close', () => {
+				delete guild_temp.markov.currently_truncating;
+				if(success === true) {
+					log(`"${data_path}" has been truncated successfully.`, "markov");
+
+					// Reset this guild's markov generator.
+					delete guild_temp.markov.object;
+					delete guild_temp.markov.state;
+					delete guild_temp.markov.lines;
+
+					// Delete backup.
+					try {
+						fs.accessSync(`${data_path}.old`);
+						fs.unlinkSync(`${data_path}.old`);
+					} catch(err) {
+						log(`Couldn't delete backup after successfully truncating markov dataset at "${data_path}". Error: ${err}`, "markov");
+					}
+				}
+
+				// If it wasn't successful, see if we need to restore the original markov dataset.
+				else {
+					try {
+						fs.accessSync(`${data_path}.old`);
+						fs.renameSync(`${data_path}.old`, data_path);
+					} catch(err) {
+						log(`Couldn't restore backup of markov dataset at "${data_path}". Error: ${err}`, "error");
+					}
+
+				}
+			});
+
+		}
 	}
 
 }
@@ -1171,6 +1286,10 @@ function feedMarkov(guild, new_string) {
 function calculateFactionPoints(message) {
 	// Return if in DM.
 	if(!message.guild) {
+		return;
+	}
+	// Return if the message has no guild member attached (rare error?).
+	if(!message.member) {
 		return;
 	}
 

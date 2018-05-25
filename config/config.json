@@ -12,6 +12,7 @@
 	"markov_max_length": 600,
 	"markov_default_max_words": 45,
 	"markov_output_pings": true,
+	"markov_data_limit": 10000,
 
 	"faction_max_messages": 5,
 	"faction_cooldown": 5,
