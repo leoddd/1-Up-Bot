@@ -109,6 +109,7 @@ const events = require('events');
 const toHumanTime = require('human-readable-time');
 const longTimeout = require('long-timeout');
 const censorString = require('censoring');
+const Notifier = require('node-notifier');
 
 /////////////
 // Constants.
@@ -180,6 +181,7 @@ function init() {
 	core.basePath = `${__dirname}/`;
 
 	core.log = log;
+	core.notify = notify;
 	core.callCommand = callCommand;
 	core.callFuncAsCommand = callFuncAsCommand;
 	core.hasCommand = hasCommand;
@@ -340,7 +342,6 @@ function hookUpBot() {
 			return;
 		}
 
-
 		// Create local config to use for the command that is affected by guild config overrides.
 		var guild_config = getGuildConfig(message.guild);
 
@@ -457,6 +458,7 @@ function callCommand(command, args, message, is_hook) {
 				"msg": `Command \`${command} ${args_string}\` failed. Oops!`,
 				"log": `Command \`${command} ${args.join(" ")}\` threw an error:\n\n${err.stack}`
 			}, message);
+			notify(`[${timestamp(new Date())}] Command \`${command} ${args.join(" ")}\` threw an error. Check terminal at timestamp for details.`, true, true, "error");
 		}
 	}
 
@@ -592,13 +594,11 @@ function handleSignal(signal) {
 	switch(signal) {
 		case "reset":
 			blocking_input = true;
-			require("child_process").spawn(process.argv.shift(), process.argv,
-			{
+			require("child_process").spawn(process.argv.shift(), process.argv, {
 				cwd: process.cwd(),
 				detached : true,
 				stdio: "inherit",
-			}
-			);
+			});
 			process.exit();
 			break;
 
@@ -608,9 +608,7 @@ function handleSignal(signal) {
 
 		case "quit":
 			blocking_input = true;
-			setTimeout(() => {
-				process.exit();
-			}, 1500);
+			setTimeout(process.exit, 1500);
 			break;
 
 	}
@@ -782,7 +780,8 @@ function getCurrentName(user, guild) {
 
 // Log the given string to the console, prepending timestamp as well as inserting separators.
 // If the type parameter is different from the last time log was called (unless undefined), a separator is inserted.
-function log(string, type) {
+// If notify is true, the log will also be put out as a notification bubble.
+function log(string, type, notify = false) {
 	if(last_log_type !== type && type !== undefined) {
 		// Print separator if this is a new type of log.
 		const COLUMNS = process.stdout.columns;
@@ -793,10 +792,32 @@ function log(string, type) {
 
 		// Remember type of log.
 		last_log_type = type;
-
 	}
 
-	console.log(`[${timestamp(new Date())}] ${string}`);
+	// Log the actual string.
+	var string_to_log = `[${timestamp(new Date())}] ${string}`;
+	console.log(string_to_log);
+
+	// If notify is true, display a notification toast.
+	if(notify === true) {
+		notify(string_to_log);
+	}
+}
+
+// Display the given string as an OS notification bubble/toast.
+// If wait is true, the notification will stick until dismissed by hand.
+// Type is the type of notification. Possible: info, warn, error.
+// If sound is true, a sound will play on OSX and Windows. If it is a path to a sound file, that will play.
+function notify(string, wait = false, sound = true, type = "info") {
+	Notifier.notify({
+		"title": bot.user.tag,
+		"subtitle": "Discord Bot",
+		"message": string,
+		"wait": wait,
+		"timeout": wait ? 127800 : 0,
+		"sound": sound,
+		"type": type,
+	}, function(err, response) {});
 }
 
 // Returns the given date object in human time.
@@ -1153,7 +1174,7 @@ function feedMarkov(guild, new_string) {
 		}`;
 
 	// If the resulting string is empty, just quit out.
-	if(new_string === "\n") {
+	if(new_string === "\n" || new_string.toLowerCase() === `\n${getCurrentName(bot.user, guild).toLowerCase()}`) {
 		return;
 	}
 
