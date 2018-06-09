@@ -192,6 +192,7 @@ function init() {
 
 	core.feedMarkov = feedMarkov;
 	core.resetFactionMessages = resetFactionMessages;
+	core.clearFaction = clearFaction;
 	core.makeEmbed = makeEmbed;
 	core.makeGuildDir = makeGuildDir;
 	core.deleteGuildDataUnlessPresent = deleteGuildDataUnlessPresent;
@@ -221,7 +222,16 @@ function init() {
 	save_interval = setInterval(commitMemory, config.save_interval * 60000);
 
 	// Log in!
-	bot.login(fs.readFileSync(config.token_string, 'utf8'));
+	try {
+		const token = fs.readFileSync(config.token_string, 'utf8');
+		bot.login(token);
+	} catch(err) {
+		log(`Could not find a valid token at '${config.token_string}'.
+			\nMake sure to create a text file with that name, at that location, that contains just your Discord API token.
+			\nIf you don't know how to find your Discord API token, head on over to https://discordapp.com/developers/applications/me and create a new bot there.`,
+			"error");
+		exit();
+	}
 }
 
 // Cleans up the bot and logs out.
@@ -432,55 +442,69 @@ function hookUpBot() {
 
 
 // Calls a command of the given name with the given arguments (array), operating using the given message object.
-function callCommand(command, args, message, is_hook) {
+function callCommand(command, args, message, is_hook = false, silent = false, check_aliases = true) {
 
-	// Start showing the typing indicator.
-	//message.channel.startTyping();
+	// If muted in channel, don't.
+	if(isChannelMuted(message.channel)) {
+		return false;
+	}
 
 	var guild_config = getGuildConfig(message.guild);
 
 	// If the command does not exist, return false.
-	if(!commands.hasOwnProperty(command)) {
-		message.channel.send(`I don't know this command. Use \`${guild_config.prefix}help\` to see a list of commands.`);
+	if(!hasCommand(command) && (!check_aliases || !hasAlias(message.guild, command))) {
+		message.channel.send(`I don't know of any \`${command}\` command. Use \`${guild_config.prefix}help\` to see a list of commands.`);
 		return false;
-
 	}
 
-	// If it does exist, check for permissions and then run it.
+	// If it's an alias, run the associated command.
+	if(!hasCommand(command)) {
+		var guild_mem = memory.guilds[message.guild.id];
+		return callCommand(guild_mem.command_aliases[command].command, guild_mem.command_aliases[command].args, message, false, false, false);
+	}
+
+	// If it's a command, check for permissions and then run it.
 	else if(hasCommandPermission(command, message)) {
 		var args_string = args.join(" ");
 
 		try {
 			var response = commands[command].call(args, {"memory": memory, "temp": temp, "message": message, "bot": bot, "config": guild_config, "core": core, "command": command, "hook": is_hook});
-			handleCommandResponse(response, message);
+			handleCommandResponse(response, message, silent);
 		} catch(err) {
 			handleCommandResponse({
 				"msg": `Command \`${command} ${args_string}\` failed. Oops!`,
 				"log": `Command \`${command} ${args.join(" ")}\` threw an error:\n\n${err.stack}`
-			}, message);
+			}, message, silent);
 			notify(`[${timestamp(new Date())}] Command \`${command} ${args.join(" ")}\` threw an error. Check terminal at timestamp for details.`, true, true, "error");
 		}
+
+		return true;
 	}
 
 	// If permission is not given, complain.
 	else {
 		message.channel.send(`You are not authorized to run \`${command}\`. It's \`${getCommandLevel(command, message)}\` only.`);
+		return false;
 	}
 
-	// Stop typing once the command is through.
-	//message.channel.stopTyping();
 }
 
 // Runs a function and handles its return value like any command.
-function callFuncAsCommand(fnc, args, message) {
+function callFuncAsCommand(fnc, args, message, silent = false) {
+	// If muted in channel, don't.
+	if(isChannelMuted(message.channel)) {
+		return false;
+	}
+
 	// Passes the same arguments as it would to a command.
 	var guild_config = getGuildConfig(message.guild);
 	var response = fnc(args, {"memory": memory, "temp": temp, "message": message, "bot": bot, "config": guild_config, "core": core});
-	handleCommandResponse(response, message);
+	handleCommandResponse(response, message, silent);
+	return true;
 }
 
 // Makes the bot react to the response object passed in.
-function handleCommandResponse(response, message) {
+function handleCommandResponse(response, message, silent = false) {
 
 	// If the response was not an object, post the return instead.
 	if(response instanceof Object !== true) {
@@ -493,7 +517,7 @@ function handleCommandResponse(response, message) {
 	}
 
 	// Post message.
-	if(response.msg || response.msgOptions) {
+	if(silent !== true && (response.msg || response.msgOptions)) {
 		response.msg = response.msg || "";
 		response.msgOptions = response.msgOptions || undefined;
 
@@ -903,7 +927,14 @@ function revivePersistentTimeout(time_key) {
 				if(commands.hasOwnProperty(func_descriptor.name)) {
 
 					// If the descriptor has a message attached, convert it back from the ID pair to a message object.
-					bot.channels.get(func_descriptor.message.channel).fetchMessage(func_descriptor.message.message)
+					var channel = bot.channels.get(func_descriptor.message.channel);
+
+					if(!channel) {
+						log(`Could not find the channel for timeout ${time_key}. Timeout failed.`, "timers");
+						return;
+					}
+
+					channel.fetchMessage(func_descriptor.message.message)
 						.then(message => {
 							callCommand(func_descriptor.name, func_descriptor.args, message, true);
 						})
@@ -1380,6 +1411,19 @@ function resetFactionMessages(ids) {
 }
 
 
+// Deletes all the data for a given faction.
+function clearFaction(guild, name) {
+	var guild_mem = memory.guilds[guild.id];
+
+	if(guild_mem.hasOwnProperty("factions") && guild_mem.factions.hasOwnProperty(name)) {
+		delete guild_mem.factions[name];
+		if(Object.keys(guild_mem.factions).length === 0) {
+			delete guild_mem.factions;
+		}
+	}
+}
+
+
 
 // Splits a string into a stripped array of words.
 // Slices off `sliced` characters at the front.
@@ -1606,7 +1650,7 @@ function isPublic(message) {
 
 	// Check if the @everyone role is denied read permissions in this channel.
 	var perms = message.channel.permissionOverwrites.get(message.guild.defaultRole.id);
-	if((perms.deny & Discord.Permissions.FLAGS.READ_MESSAGES) !== 0) {
+	if(perms && (perms.deny & Discord.Permissions.FLAGS.READ_MESSAGES) !== 0) {
 		return false;
 	}
 	else {
@@ -1622,6 +1666,15 @@ function makeEmbed() {
 // Returns whether a command of the given name exists.
 function hasCommand(command) {
 	return commands.hasOwnProperty(command);
+}
+
+// Returns whether the given guild has an alias under the given name.
+function hasAlias(guild, alias_name) {
+	var guild_mem = memory.guilds[guild.id];
+	if(guild_mem.command_aliases && guild_mem.command_aliases.hasOwnProperty(alias_name)) {
+		return true;
+	}
+	return false;
 }
 
 // Returns an array of command names.

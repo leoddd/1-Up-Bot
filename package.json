@@ -1,7 +1,7 @@
 {
   "name": "leod-discord-bot",
   "version": "1.0.0",
-  "description": "Auto responding, annoying Markov-chain Discord bot.",
+  "description": "1-Up World's (discord.gg/mario) Discord bot. Handles factions along with a few fun commands, such as markov chains.",
   "main": "bot_core.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

@@ -42,11 +42,22 @@ exports.help = (config, command, message, core) => {
 exports.call = (args, info) => {
 
 	if(!info.message.guild) {
-		return "Cannot manage factions inside DMs."
+		return "Cannot manage factions inside DMs.";
 	}
 
 	var guild_mem = info.memory.guilds[info.message.guild.id];
 
+	// Verify that all currently available factions are still roles that exist.
+	if(guild_mem.factions && Object.keys(guild_mem.factions).length > 0) {
+		Object.keys(guild_mem.factions).forEach(role_name => {
+			if(info.message.guild.roles.find("name", role_name) === null) {
+				// The role isn't found, so let's get rid of its faction.
+				info.core.clearFaction(info.message.guild, role_name);
+			}
+		});
+	}
+
+	// Run the actual command.
 	return info.core.commandSwitch(args, {
 
 		add: args => {
@@ -105,11 +116,10 @@ exports.call = (args, info) => {
 			else {
 				var cur_faction = guild_mem.factions[role_name];
 				var return_string = `Removed the \`${role_name}\` role from the list of joinable factions. \
-								\nMembers: \`${info.message.guild.roles.find("name", role_name).members.size}\` - ${getScore(cur_faction)}`;
-				delete guild_mem.factions[role_name];
-				if(Object.keys(guild_mem.factions).length === 0) {
-					delete guild_mem.factions;
-				}
+					\nMembers: \`${info.message.guild.roles.find("name", role_name).members.size}\` - ${getScore(cur_faction)}`;
+
+				info.core.clearFaction(info.message.guild, role_name);
+
 				return return_string;
 			}
 

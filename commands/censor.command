@@ -128,7 +128,7 @@ exports.call = (args, info) => {
 			if(guild_censors && guild_censors.length > 0) {
 				guild_censors.sort();
 				var censor_num = guild_censors.length;
-				return return_string = `**Found ${censor_num} censor${censor_num > 1 ? "s" : ""}:**\n\`${guild_censors.join("\`, \`")}\``;
+				return `**Found ${censor_num} censor${censor_num > 1 ? "s" : ""}:**\n\`${guild_censors.join("\`, \`")}\``;
 			}
 
 			// If no censors are found, advise enabling global ones at least.

@@ -22,7 +22,7 @@
 	"max_hooks_per_message": 6,
 
 	"use_global_censors": true,
-	"global_censored_words": ["fag", "faggot", "nigger", "tranny", "kike", "dyke", "nigga", "retard", "retarded"],
+	"global_censored_words": ["fag", "faggot", "nigger", "tranny", "kike", "dyke", "nigga", "retard", "retarded", "kys"],
 
 	"save_interval": 10,
 	"guild_data_timeout_hours": 48,

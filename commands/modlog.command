@@ -40,8 +40,8 @@ const verbs = ["hiding", "raiding", "spamming", "touching", "annoying", "swearin
 const adjectives = ["new", "wild", "ferocious", "christian", "racist", "unplanned", "wrong", "long", "dead", "funny", "silly", "progressive", "red-pilled", "bad", "very nintendo", "similar to Luigi", "old", "close", "swanky", "funky", "fast and furious"];
 const superlatives = ["worst", "best", "longest", "edgiest", "most spanish", "stinkiest", "most dry", "filthiest", "least offensive", "most terrible", "most gut-wrenching"];
 const adverbs = ["respectfully", "loudly", "wildly", "quickly", "splendidly", "accidentally", "properly", "improperly", "odorously", "impossibly", "sweetly", "tenderly", "lovingly", "hatefully", "apathetically", "professionally"];
-const objects = ["Madame Broode", "the bot", "a Wii remote", "FLUDD", "the game", "Luigi", "Mario", "Daisy", "Bowser", "child", "Peach", "Wario", "Waluigi", "Jr. Troopa", "global warming", "animal right", "meme", "the next Nintendo Direct", "Arthur"];
-const locations = ["server", "castle", "fortress", "channel", "country", "steakhouse", "taco stand", "apartment", "support group", "concert", "bridge"];
+const objects = ["Iggy", "Larry", "Lemmy", "Morton", "Roy", "Wendy", "Ludwig", "myself", "Nintendo Labo", "Talia", "tax fraud", "Teal", "Dom", "<@254404732343418880>", "catto", "Matt", "Mia", "Amir", "Ari", "Nathan", "Tim", "Madame Broode", "the bot", "a Wii remote", "FLUDD", "the game", "Luigi", "Mario", "Daisy", "Bowser", "child", "Peach", "Wario", "Waluigi", "Jr. Troopa", "global warming", "animal right", "meme", "the next Nintendo Direct", "Arthur"];
+const locations = ["ikea", "server", "castle", "fortress", "channel", "country", "steakhouse", "taco stand", "apartment", "support group", "concert", "bridge"];
 
 exports.call = (args, info) => {
 	// Create the intro (ex: "Banned Santa for 8.3 years for").
@@ -76,7 +76,7 @@ exports.call = (args, info) => {
 			()=>`being disrespectful towards ${getRandomEntry(objects)} in my presence`,
 			()=>`admitting to having smuggled ${info.core.randRange({"min": 2, "max": 299, "fixed": 0})} ${getRandomEntry(objects)}s into the ${getRandomEntry(locations)}`,
 			()=>`trying to bypass a previous ban by ${getRandomEntry(verbs)} under a ${getRandomEntry(adjectives)} account`,
-			()=>`going door to door ${getRandomEntry(verbs)} about ${getRandomEntry(objects)}`,
+			()=>`going door to door ${getRandomEntry(verbs)} ${getRandomEntry(objects)}`,
 			()=>`tying a ${getRandomEntry(adjectives)} string of ${getRandomEntry(objects)}s to their feet and ${getRandomEntry(verbs)} them around ${getRandomEntry(adverbs)}`,
 			()=>`starting a cult about ${getRandomEntry(objects)} ${getRandomEntry(adverbs)}`,
 			()=>`${getRandomEntry(verbs)} the ${getRandomEntry(objects)} with only ${info.core.randRange({"min": 16, "max": 119, "fixed": 0})} stars`,
@@ -85,10 +85,10 @@ exports.call = (args, info) => {
 			()=>`not ${getRandomEntry(verbs)} all the ${getRandomEntry(objects)} in the ${getRandomEntry(locations)}`,
 			()=>`${getRandomEntry(verbs)} their ${getRandomEntry(objects)} exam ${getRandomEntry(adverbs)}`,
 			()=>`${getRandomEntry(verbs)} ${getRandomEntry(objects)} in the ${getRandomEntry(locations)} ${info.core.randRange({"min": 2, "max": 49, "fixed": 0})} times`,
-			()=>`going online without their ${getRandomEntry(objects)}'s permission`,
+			()=>`going online without ${getRandomEntry(objects)}'s permission`,
 			()=>`attempting to summon a ${getRandomEntry(adjectives)} ${getRandomEntry(objects)}`,
 			()=>`trying to pirate the ${getRandomEntry(superlatives)} ${getRandomEntry(objects)} images`,
-			()=>`trying to sync ${getRandomEntry(objects)} with ${getRandomEntry(adjectives)} ${getRandomEntry(objects)}s`,
+			()=>`trying to sync ${getRandomEntry(objects)} with ${getRandomEntry(adjectives)} batteries`,
 			()=>`posting memes in a ${getRandomEntry(adjectives)} ${getRandomEntry(locations)}`,
 			()=>`implementing ${getRandomEntry(adjectives)} features into ${getRandomEntry(objects)}`,
 			()=>`${getRandomEntry(verbs)} the ${getRandomEntry(adjectives)} ${getRandomEntry(objects)} faction`,
