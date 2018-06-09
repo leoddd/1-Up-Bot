@@ -292,6 +292,14 @@ function hookUpBot() {
 		blocking_input = false;
 
 		log(`Bot has started. Tag: ${bot.user.tag} - Guilds: ${bot.guilds.size}`, "boot");
+		if(bot.guilds.size === 0) {
+			
+			bot.generateInvite(["ADD_REACTIONS", "SEND_MESSAGES", "EMBED_LINKS", "ATTACH_FILES", "USE_EXTERNAL_EMOJIS", "CHANGE_NICKNAME", "MANAGE_ROLES"])
+			.then(link => {
+				bot.log(`To invite the bot into your first server, visit this link: ${inviteLink}`, "first time");
+			});
+
+		}
 	});
 
 
