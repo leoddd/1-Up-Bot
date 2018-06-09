@@ -230,7 +230,6 @@ function init() {
 			\nMake sure to create a text file with that name, at that location, that contains just your Discord API token.
 			\nIf you don't know how to find your Discord API token, head on over to https://discordapp.com/developers/applications/me and create a new bot there.`,
 			"error");
-		exit();
 	}
 }
 
@@ -293,10 +292,10 @@ function hookUpBot() {
 
 		log(`Bot has started. Tag: ${bot.user.tag} - Guilds: ${bot.guilds.size}`, "boot");
 		if(bot.guilds.size === 0) {
-			
+
 			bot.generateInvite(["ADD_REACTIONS", "SEND_MESSAGES", "EMBED_LINKS", "ATTACH_FILES", "USE_EXTERNAL_EMOJIS", "CHANGE_NICKNAME", "MANAGE_ROLES"])
 			.then(link => {
-				bot.log(`To invite the bot into your first server, visit this link: ${inviteLink}`, "first time");
+				log(`To invite the bot into your first server, visit this link: ${link}`, "first time");
 			});
 
 		}
