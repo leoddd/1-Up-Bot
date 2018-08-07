@@ -74,6 +74,12 @@ exports.call = (args, info) => {
 		},
 
 
+		"mention_markov": {
+			"help": "Whether I should respond to my name (and @s) with a markov chain.",
+			"legal": value => {return value === "true" || value === "false"},
+		},
+
+
 		"random_markov": {
 			"help": "Whether I should randomly interject with my conversational talents without being asked to sometimes.",
 			"legal": value => {return value === "true" || value === "false"},

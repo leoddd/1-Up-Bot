@@ -159,12 +159,6 @@ exports.call = (args, info) => {
 				args.splice(0, 1);
 			}
 
-			// If the first argument then is a number, use it as the limit and remove it.
-			if(!isNaN(args[0])) {
-				limit = parseInt(args[0]);
-				args.splice(0, 1);
-			}
-
 		}
 
 		// If no args passed, pick a random key.

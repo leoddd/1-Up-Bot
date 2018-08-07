@@ -1,0 +1,43 @@
+//////////////////////////////
+// Parser file for leod's bot.
+/////
+//
+// Needs to export a 'parse' function that is called for every message the bot reads.
+// function parse(info)
+//   info: An object with information about the current bot state. Keys:
+//     memory: The global memory object the bot posesses. Kept between reboots.
+//     temp: The temporary memory object the bot posesses. Deleted upon reboot.
+//     message: Discord.js's Message object. Represents the message that triggered this command, if it is a command.
+//     bot: Discord.js Client object. Represents the bot.
+//     config: The config object.
+//     core: A subset of bot_core to expose some functions to commands. Is eventEmitter, look at its definition in init() for functions.
+//           Pay special attention to the command* helper functions.
+//
+/////
+
+// Runs every message it receives past its guild's set awaits.
+// See bot_core's setAwait().
+exports.parse = (info) => {
+
+	var pending_awaits;
+	// Grab either guild or user awaits, depending on if we are in a guild or not.
+	if(info.message.channel.type !== "dm") {
+		pending_awaits = info.temp.guilds[info.message.guild.id].awaits;
+	}
+	else if(info.temp.users.hasOwnProperty(info.message.author.id)) {
+		pending_awaits = info.temp.users[info.message.author.id].awaits;
+	}
+
+	// Check if there are any awaits set at all.
+	if(!pending_awaits) {
+		return;
+	}
+
+	// If there are any, let's loop through all of them.
+	Object.keys(pending_awaits).forEach(await_ID => {
+
+		pending_awaits[await_ID](info, () => {info.core.clearAwait(info.message.guild.id, await_ID)});
+
+	});
+
+}

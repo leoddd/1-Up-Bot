@@ -1,0 +1,22 @@
+//////////////////////////////
+// Parser file for leod's bot.
+/////
+//
+// Needs to export a 'parse' function that is called for every message the bot reads.
+// function parse(info)
+//   info: An object with information about the current bot state. Keys:
+//     memory: The global memory object the bot posesses. Kept between reboots.
+//     temp: The temporary memory object the bot posesses. Deleted upon reboot.
+//     message: Discord.js's Message object. Represents the message that triggered this command, if it is a command.
+//     bot: Discord.js Client object. Represents the bot.
+//     config: The config object.
+//     core: A subset of bot_core to expose some functions to commands. Is eventEmitter, look at its definition in init() for functions.
+//           Pay special attention to the command* helper functions.
+//
+/////
+
+// Parser logic:
+exports.parse = (info) => {
+
+	return;
+}

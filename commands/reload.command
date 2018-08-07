@@ -58,9 +58,15 @@ exports.call = (args, info) => {
 		},
 
 		commands: () => {
-			signals.push("reload");
+			signals.push("reload_commands");
 
 			reload_string = list(reload_string, "commands");
+		},
+
+		parsers: () => {
+			signals.push("reload_parsers");
+
+			reload_string = list(reload_string, "parsers");
 		},
 
 		all: () => {

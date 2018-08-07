@@ -1,0 +1,181 @@
+//////////////////////////////
+// Parser file for leod's bot.
+/////
+//
+// Needs to export a 'parse' function that is called for every message the bot reads.
+// function parse(info)
+//   info: An object with information about the current bot state. Keys:
+//     memory: The global memory object the bot posesses. Kept between reboots.
+//     temp: The temporary memory object the bot posesses. Deleted upon reboot.
+//     message: Discord.js's Message object. Represents the message that triggered this command, if it is a command.
+//     bot: Discord.js Client object. Represents the bot.
+//     config: The config object.
+//     core: A subset of bot_core to expose some functions to commands. Is eventEmitter, look at its definition in init() for functions.
+//           Pay special attention to the command* helper functions.
+//
+/////
+
+const fs = require('fs-extra');
+
+// Adds the given string to the markov chain object for the given guild and saves it to disc.
+exports.parse = (info) => {
+
+	var message = info.message;
+
+	// Don't take into account command calls, locked messages or bot messages.
+	if(info.message.content.indexOf(info.config.prefix) === 0
+		|| !info.core.isPublic(info.message)
+		|| info.message.author.bot) {
+		return;
+	}
+
+	var config = info.config;
+	if(config.random_markov !== true) {
+		// Only feed it in if the server even wants random markoving to exist.
+		return;
+	}
+
+	var memory = info.memory;
+	var temp = info.temp;
+	var log = info.core.log;
+
+	var guild = message.guild;
+	var new_string = message.content;
+
+
+	// Trim and sanitize the string.
+	new_string =
+		`\n${
+			new_string
+			.trim()
+			.replace(/\s+/g, " ")
+		}`;
+
+	// If the resulting string is empty, just quit out.
+	if(new_string === "\n" || new_string.toLowerCase() === `\n${info.core.getCurrentName(info.bot.user, guild).toLowerCase()}`) {
+		return;
+	}
+
+	// Initialize guild's markov memory if needed.
+	var guild_temp = temp.guilds[guild.id];
+	if(guild_temp.markov === undefined) {
+		guild_temp.markov = {};
+	}
+
+	// To start, simply feed the new string into the running markov machine, no matter what happens to the data files.
+	if(guild_temp.markov.state === 'ready') {
+		guild_temp.markov.object.seed(new_string);
+	}
+
+
+	// Then, see if we need to create a fresh file.
+	var data_path = `${config.guilds_dir}${guild.id}/${config.markov_file}`;
+
+	try {
+		fs.accessSync(data_path, fs.constants.R_OK | fs.constants.W_OK);
+	}	catch(err) {
+		try {
+			fs.writeFileSync(data_path, fs.readFileSync(config.base_markov_data, "utf8"));
+		} catch(err) {
+			log(`Could neither find nor create markov data file at ${data_path}. Error: "${err}"`, "markov");
+			return;
+		}
+	}
+
+	// File is guaranteed to be there now, so try and append to it.
+	try {
+		fs.appendFileSync(data_path, new_string);
+	} catch(err) {
+		log(`Could not save new markov data to "${data_path}".`, "markov");
+	}
+
+	// Increase the number of lines the file has, and if it exceeds the limit, truncate it by a bunch.
+	if(guild_temp.markov.state === 'ready' && guild_temp.markov.currently_truncating !== true) {
+		guild_temp.markov.lines += 1;
+		if(guild_temp.markov.lines >= config.markov_data_limit) {
+			guild_temp.markov.currently_truncating = true;
+			log(`"${data_path}" exceeded the markov data limit and will be truncated.`, "markov");
+
+
+			// Read the file data and discard everything below a certain line count.
+			var markov_stream = fs.createReadStream(data_path, {encoding: "utf8", highWaterMark: 16 * 1024});
+			var new_file = undefined;
+			var line_count = -1;
+			var success = true;
+
+			markov_stream.on('data', (chunk) => {
+				// Start out by counting lines until we hit our limit (half the actual limit).
+				var last_newline = -1;
+				do {
+					last_newline = chunk.indexOf("\n", last_newline + 1);
+					line_count += 1;
+					// If we reach a line number higher than half the limit, stop counting and pipe it.
+					if(line_count >= Math.ceil(config.markov_data_limit / 3)) {
+						markov_stream.removeAllListeners('data');
+
+						// Create new file and fill it with the remainder of this chunk.
+						try {
+							fs.accessSync(`${data_path}.old`);
+							fs.unlinkSync(`${data_path}.old`);
+						} catch(err) { // Empty because it's not an issue if we can't delete that.
+						}
+
+						try {
+							fs.renameSync(data_path, `${data_path}.old`);
+						} catch(err) {
+							log(`Could not rename markov dataset at ${data_path}. Error: ${err}`, "markov")
+							success = false;
+							return;
+						}
+						new_file = fs.createWriteStream(data_path);
+						new_file.write(chunk.substring(last_newline + 1));
+
+						// Pipe the rest of the stream into the file directly.
+						markov_stream.pipe(new_file);
+
+						// Exit while loop.
+						break;
+					}
+				} while(last_newline !== -1);
+			});
+
+			markov_stream.on('error', (err) => {
+				log(`Error when trying to truncate markov dataset at "${data_path}": ${err}`, "markov");
+				success = false;
+			});
+
+			markov_stream.on('close', () => {
+				delete guild_temp.markov.currently_truncating;
+				if(success === true) {
+					log(`"${data_path}" has been truncated successfully.`, "markov");
+
+					// Reset this guild's markov generator.
+					delete guild_temp.markov.object;
+					delete guild_temp.markov.state;
+					delete guild_temp.markov.lines;
+
+					// Delete backup.
+					try {
+						fs.accessSync(`${data_path}.old`);
+						fs.unlinkSync(`${data_path}.old`);
+					} catch(err) {
+						log(`Couldn't delete backup after successfully truncating markov dataset at "${data_path}". Error: ${err}`, "markov");
+					}
+				}
+
+				// If it wasn't successful, see if we need to restore the original markov dataset.
+				else {
+					try {
+						fs.accessSync(`${data_path}.old`);
+						fs.renameSync(`${data_path}.old`, data_path);
+					} catch(err) {
+						log(`Couldn't restore backup of markov dataset at "${data_path}". Error: ${err}`, "error");
+					}
+
+				}
+			});
+
+		}
+	}
+
+}

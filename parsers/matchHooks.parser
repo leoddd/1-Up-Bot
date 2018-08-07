@@ -1,0 +1,97 @@
+//////////////////////////////
+// Parser file for leod's bot.
+/////
+//
+// Needs to export a 'parse' function that is called for every message the bot reads.
+// function parse(info)
+//   info: An object with information about the current bot state. Keys:
+//     memory: The global memory object the bot posesses. Kept between reboots.
+//     temp: The temporary memory object the bot posesses. Deleted upon reboot.
+//     message: Discord.js's Message object. Represents the message that triggered this command, if it is a command.
+//     bot: Discord.js Client object. Represents the bot.
+//     config: The config object.
+//     core: A subset of bot_core to expose some functions to commands. Is eventEmitter, look at its definition in init() for functions.
+//           Pay special attention to the command* helper functions.
+//
+/////
+
+// Reads in a message and calls all commands that are hooked up via the hook commands. 
+exports.parse = (info) => {
+
+	var message = info.message;
+	var guild_config = info.config;
+	var bot = info.bot;
+
+	// Only match in guilds, not in DMs.
+	if(message.guild) {
+
+		// Check if this guild has any hooks at all.
+		var all_hooks = info.temp.guilds[message.guild.id].hooks || {};
+
+		var dynamic_hooks = {};
+
+		// If random markoving is on, respond to its own name.
+		if(guild_config.mention_markov === true) {
+
+			// Respond to its name.
+			var nick = info.core.getCurrentName(bot.user, message.guild);
+			dynamic_hooks[`^(.*${nick}.*)$`] = {
+				"regex": new RegExp(`^(.*${nick}.*)$`, "i"),
+				"command": "markov",
+				"args": [],
+			};
+
+			// Respond to pings.
+			dynamic_hooks[`<@!${bot.user.id}>`] = {
+				"regex": new RegExp(`^(.*\\<\\@\\!?${bot.user.id}\\>.*)$`, ""),
+				"command": "markov",
+				"args": [],
+			};
+
+		}
+
+		// Add them to the hooks to be iterated.
+		all_hooks = Object.assign({}, dynamic_hooks, all_hooks);
+
+		if(all_hooks && Object.keys(all_hooks).length !== 0) {
+			Object.keys(all_hooks).forEach(hook_ID => {
+				var cur_hook = all_hooks[hook_ID];
+
+				// Check for matches (depending on globality, multiple times) and execute on them.
+				var hook_matches = undefined;
+				var number_of_matches = 0;
+
+				while(number_of_matches < guild_config.max_hooks_per_message && (hook_matches = cur_hook.regex.exec(message.content)) !== null) {
+					// If this isn't a global regex, hack it to only run once.
+					if(cur_hook.regex.global) {
+						number_of_matches += 1;
+					} else {
+						number_of_matches = guild_config.max_hooks_per_message;
+					}
+
+					if(hook_matches) {
+						// If the regex passed included match groups, append each string group matched as an argument.
+						var args_to_pass = cur_hook.args.slice();
+
+						// Remove first argument, because that is merely the full matched string which is not needed.
+						hook_matches.shift();
+
+						hook_matches.forEach(matched_string => {
+							if(matched_string !== "") {
+								args_to_pass = args_to_pass.concat(matched_string.split(" "));
+							}
+						});
+
+						// Call the associated command with the given arguments.
+						info.core.log(`${message.author.tag} (${message.author.id}) triggered hook \`${hook_ID}\` => \`${cur_hook.command} ${args_to_pass.join(" ")}\`.`, "log");
+						info.core.callCommand(cur_hook.command, args_to_pass, message, true);
+					}
+
+				}
+
+			});
+
+		}
+
+	}
+}

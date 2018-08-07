@@ -56,7 +56,7 @@ exports.call = (args, info) => {
 	// Check if this is a valid level to set it to.
 	var new_level = args[1];
 
-	if(!info.core.isValidPermissionLevel(new_level)) {
+	if(["all", "staff", "admin"].indexOf(new_level) === -1) {
 		return `\`${new_level}\` is not a valid authority level.`;
 	}
 	if(!info.core.hasLevel(new_level, info.message)) {

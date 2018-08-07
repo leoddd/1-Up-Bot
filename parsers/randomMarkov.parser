@@ -1,0 +1,53 @@
+//////////////////////////////
+// Parser file for leod's bot.
+/////
+//
+// Needs to export a 'parse' function that is called for every message the bot reads.
+// function parse(info)
+//   info: An object with information about the current bot state. Keys:
+//     memory: The global memory object the bot posesses. Kept between reboots.
+//     temp: The temporary memory object the bot posesses. Deleted upon reboot.
+//     message: Discord.js's Message object. Represents the message that triggered this command, if it is a command.
+//     bot: Discord.js Client object. Represents the bot.
+//     config: The config object.
+//     core: A subset of bot_core to expose some functions to commands. Is eventEmitter, look at its definition in init() for functions.
+//           Pay special attention to the command* helper functions.
+//
+/////
+
+// Do random markoving if that is enabled and the message was not a command.
+exports.parse = (info) => {
+
+	if(!info.message.guild) {
+		return;
+	}
+
+	var guild_config = info.config;
+	var message = info.message;
+
+	if(guild_config.random_markov && message.content.indexOf(info.config.prefix) !== 0) {
+
+		// If it has no markov frequency temp mem right now, create it.
+		var guild_temp = info.temp.guilds[message.guild.id]
+		if(guild_temp.since_last_markov === undefined) {
+			guild_temp.since_last_markov = 0;
+			guild_temp.current_chance = guild_config.markov_chance;
+		}
+
+		// Only markov after a certain amount of messages, so as to not spam TOO much.
+		if(guild_temp.since_last_markov < guild_config.markov_min_messages) {
+			guild_temp.since_last_markov++;
+		}
+		// Try and fall into the random range.
+		else if(info.core.randRange({"min": 0, "max": 100, "fixed": 2}) <= guild_temp.current_chance) {
+			guild_temp.since_last_markov = 0;
+			guild_temp.current_chance = guild_config.markov_chance;
+			info.core.callCommand('markov', info.core.makeArrayOfWords(message.content), message);
+		}
+		// Increase chance next time if we didn't markov.
+		else {
+			guild_temp.current_chance += guild_config.markov_chance_increase;
+		}
+
+	}
+}

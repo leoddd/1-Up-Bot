@@ -41,5 +41,7 @@ exports.call = (args, info) => {
 
 	info.bot.user.setActivity(str, {type: 'LISTENING'});
 
-	return {msg: 'As you wish.', memory: {activity: {type: 'LISTENING', string: str}}};
+	info.memory.activity = {string: str, type: 'LISTENING'};
+
+	return 'As you wish.';
 }

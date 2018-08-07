@@ -31,8 +31,8 @@ exports.level = "all";
 
 // Help function:
 exports.help = (config, command, message) => {
-	return `Get information pertaining to a given Yu-Gi-Oh! card. \
-					\nUsage: \`${config.prefix}${command} [Yu-Gi-Oh! card name]\``;
+	return `Get information pertaining to a given Yu-Gi-Oh! card, or even a random one by asking for "random". \
+					\nUsage: \`${config.prefix}${command} [Yu-Gi-Oh! card name|random]\``;
 }
 
 // Command logic:
@@ -117,7 +117,17 @@ exports.call = (args, info) => {
 
 		// Fuzzy search a card in the database.
 		var search_string = args.join(" ");
-		var results = fuzzy.filter(search_string, ygomem.card_names).map(el => { return el.string; });
+		var results;
+
+		// If the search string is "random", get a random entry from the card name database.
+		if(search_string === "random") {
+			results = [getRandomEntry(ygomem.card_names)];
+		}
+
+		// If we aren't asking for a random card, fuzzy match it from the entire database array.
+		else {
+			results = fuzzy.filter(search_string, ygomem.card_names).map(el => { return el.string; });
+		}
 		
 		// If no results, complain.
 		if(results.length === 0) {
@@ -348,4 +358,9 @@ exports.call = (args, info) => {
 function failedToConnect(info, err, url) {
 	core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
 	info.message.channel.send(`Could not reach Yu-Gi-Oh card database at ${url}, sorry. Error: \`\`\`${err}\`\`\`.`);
+}
+
+// Returns a random entry from the given array.
+function getRandomEntry(array) {
+	return array[Math.floor(Math.random()*array.length)];
 }

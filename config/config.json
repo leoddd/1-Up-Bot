@@ -5,6 +5,7 @@
 	"use_hierarchy": true,
 	"staff_perms": 8326,
 
+	"mention_markov": true,
 	"random_markov": true,
 	"markov_min_messages": 7,
 	"markov_chance": 3,
@@ -28,6 +29,7 @@
 	"guild_data_timeout_hours": 48,
 
 	"command_dir": "./commands/",
+	"parser_dir": "./parsers/",
 	"global_dir": "./global_data/",
 	"guilds_dir": "./guild_data/",
 	"memory_file": "memory.json",
