@@ -26,6 +26,7 @@
     "node-cleanup": "^2.1.2",
     "node-notifier": "^5.2.1",
     "random-floating": "^1.0.1",
+    "random-part-of-speech": "^1.0.0",
     "uws": "^9.147.0"
   },
   "devDependencies": {},

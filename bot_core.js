@@ -743,7 +743,10 @@
 	function updateGuildChannelList(guild_id) {
 		var guild_mem = memory.guilds[guild_id];
 		if(guild_mem) {
-			memory.guilds[guild_id].channel_ids = bot.guilds.get(guild_id).channels.keyArray();
+			var guild_cache = bot.guilds.get(guild_id);
+			if(guild_cache) {
+				memory.guilds[guild_id].channel_ids = guild_cache.channels.keyArray();
+			}
 		}
 	}
 

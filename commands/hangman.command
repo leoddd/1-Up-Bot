@@ -152,7 +152,7 @@ exports.call = async (args, info) => {
 
 
 	if(current_temp.hangman === true) {
-		send(`There is already a game underway in this channel, please wait for it to finish or use ${state_request} to see where it's at!`);
+		send(`There is already a game underway in this channel, please wait for it to finish or use \`${state_request}\` to see where it's at!`);
 		return;
 	}
 	current_temp.hangman = true;
@@ -194,12 +194,12 @@ exports.call = async (args, info) => {
 				// Function that will fail the search for a custom phrase.
 				var failPhrase = () => {
 					info.message.author.send(`Custom game of hangman in <#${info.message.channel.id}> (${place_name}) has been cancelled, as you didn't give me a phrase to start it with.`);
-					info.core.clearAwait(info.message.author.id, await_ID, true);
+					info.core.clearAwait(info.message.author.id, dm_await_ID, true);
 					resolveCustom(false);
 				}
 
 				// Reject the promise after the timeout is out.
-				var timeout_id = setTimeout(failPhrase, CUSTOM_TIMEOUT * 1000);
+				var phrase_timeout_id = setTimeout(failPhrase, CUSTOM_TIMEOUT * 1000);
 
 
 				// DM the author, asking them to hand over a phrase.
@@ -210,7 +210,7 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 				);
 
 				// Set an await for the author's DMs.
-				var await_ID = info.core.setAwait(info.message.author.id, (response_info, clearThis) => {
+				var dm_await_ID = info.core.setAwait(info.message.author.id, (response_info, clearThis) => {
 
 					var phrase = response_info.message.content;
 					if(phrase.indexOf(phrase_prefix) === 0) {
@@ -224,7 +224,7 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 						// If the phrase is valid, start the game!
 						else {
 							resolveCustom([phrase]);
-							clearTimeout(timeout_id);
+							clearTimeout(phrase_timeout_id);
 						}
 					}
 
@@ -244,7 +244,7 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 	});
 
 	if(word === false) {
-		send("Couldn't start the game of hangman for lack of a word. Try again?");
+		send("Couldn't start the game of hangman for lack of a phrase. Try again?");
 		delete current_temp.hangman;
 		return;
 	}
@@ -262,12 +262,12 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 	var arm_right = getRandomEntry(ARMS);
 
 	// Timeout after x seconds of no guesses. Reset every new guess or state request.
-	var timeout_id;
+	var guess_timeout_id;
 	var resetTimeout = () => {
-		if(timeout_id) {
-			clearTimeout(timeout_id);
+		if(guess_timeout_id) {
+			clearTimeout(guess_timeout_id);
 		}
-		timeout_id = setTimeout(() => {
+		guess_timeout_id = setTimeout(() => {
 			send("The game of hangman has been cancelled due to a lack of recent guesses.");
 			endHangman();
 		}, GUESS_TIMEOUT * 1000);
@@ -277,6 +277,10 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 	// Prints out the current state of the hangman game.
 	// If completed is `true`, all letters will be shown.
 	var printState = completed => {
+
+		// Reset the timeout whenever the state is printed.
+		resetTimeout();
+
 		// Generate current letter state (the underscores, you know).
 		var letter_state = "";
 		for(var needed_letter of word) {
@@ -295,7 +299,7 @@ The game will be cancelled in ${CUSTOM_TIMEOUT} seconds if you haven't given me 
 		}
 		letter_state = letter_state.trim();
 
-		// Grab current state of "drawing".#
+		// Grab current state of "drawing".
 		var drawing_state = "";
 		if(bad_guesses > 0) {
 			drawing_state = DRAWINGS["hangman"][bad_guesses - 1]
@@ -340,14 +344,14 @@ Better luck next time, <@${participants.join(">, <@")}>!`
 		participants.splice(participants.indexOf(player_id), 1);
 
 		send(
-`Congratulations <@${player_id}>, you got it${participants.length > 0 ? " first" : ""}!${participants.length > 0 ? `Shoutouts also to <@${participants.join(">, <@")}> for attempting to help!` : ""}`
+`Congratulations <@${player_id}>, you got it${participants.length > 0 ? " first" : ""}!${participants.length > 0 ? `\nShoutouts also to <@${participants.join(">, <@")}> for attempting to help!` : ""}`
 		);
 		endHangman();
 	}
 
 	var endHangman = () => {
 		info.core.clearAwait(current_id, await_ID, is_DM);
-		clearTimeout(timeout_id);
+		clearTimeout(guess_timeout_id);
 		delete current_temp.hangman;
 	}
 
@@ -468,9 +472,6 @@ Better luck next time, <@${participants.join(">, <@")}>!`
 					guessWord(guess);
 				}
 
-				// No matter the kind, refresh the timeout.
-				resetTimeout();
-
 				// No matter the kind, add the participant to the list of players.
 				if(participants.indexOf(player_id) === -1) {
 					participants.push(player_id);
@@ -480,7 +481,6 @@ Better luck next time, <@${participants.join(">, <@")}>!`
 			// If not, maybe it's a state request.
 			else if(guess === state_request) {
 				printState();
-				resetTimeout();
 			}
 
 			// If not, maybe the author is trying to quit it.

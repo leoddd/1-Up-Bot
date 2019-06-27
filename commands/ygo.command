@@ -68,6 +68,7 @@ exports.call = (args, info) => {
 
 		// Request the card name database.
 		getJSON(YGO_ALL_CARDS, (err, data) => {
+			info.message.channel.stopTyping();
 
 			if(err) {
 				failedToConnect(info, err, YGO_ALL_CARDS);
@@ -90,6 +91,7 @@ exports.call = (args, info) => {
 		});
 
 		core.log(`Started loading the Yu-Gi-Oh card name database from "${YGO_ALL_CARDS}".`, "log");
+		info.message.channel.startTyping();
 	}
 
 
@@ -356,8 +358,8 @@ exports.call = (args, info) => {
 
 // If we failed to connect to the card database, remove all dependencies on it and complain.
 function failedToConnect(info, err, url) {
-	core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
-	info.message.channel.send(`Could not reach Yu-Gi-Oh card database at ${url}, sorry. Error: \`\`\`${err}\`\`\`.`);
+	info.core.log(`Could not reach Yu-Gi-Oh card database. Error: ${err}.`, "error");
+	info.message.channel.send(`Could not reach Yu-Gi-Oh card database at ${url}. Error: \`\`\`${err}\`\`\``);
 }
 
 // Returns a random entry from the given array.

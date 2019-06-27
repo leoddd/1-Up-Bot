@@ -47,7 +47,8 @@ exports.call = (args, info) => {
 				"attachment": Buffer.from(memory),
 			}});
 
-			return {"log": memory};
+      info.core.log(memory, "memorydump");
+			return;
 		},
 		default: args => {
 			var memory = JSON.stringify(cloneSafeJSON(info.memory, 20), null, "\t")
@@ -57,7 +58,9 @@ exports.call = (args, info) => {
 				"attachment": Buffer.from(memory),
 			}});
 
-			return {"log": memory};
+
+      info.core.log(memory, "memorydump");
+			return;
 		}
 	});
 
