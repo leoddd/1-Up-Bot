@@ -24,7 +24,7 @@
     "long-timeout": "^0.1.1",
     "markov": "0.0.7",
     "node-cleanup": "^2.1.2",
-    "node-notifier": "^5.2.1",
+    "node-notifier": "^8.0.1",
     "random-floating": "^1.0.1",
     "random-part-of-speech": "^1.0.0",
     "uws": "^9.147.0"
